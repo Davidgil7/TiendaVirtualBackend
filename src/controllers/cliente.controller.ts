@@ -15,17 +15,16 @@ import {
 import {Llaves} from '../config/llaves';
 import {Cliente, Credenciales} from '../models';
 import {ClienteRepository} from '../repositories';
-import {AutenticacionService} from '../services';
+import {AutentificacionService} from '../services';
 const fetch = require('node-fetch');
 
 export class ClienteController {
   constructor(
     @repository(ClienteRepository)
     public clienteRepository: ClienteRepository,
-    @service(AutenticacionService)
-    public servicioAutenticacion: AutenticacionService
+    @service(AutentificacionService)
+    public servicioAutentificacion: AutentificacionService
   ) { }
-
 
   @post("/identificarCliente", {
     responses: {
@@ -34,12 +33,12 @@ export class ClienteController {
       }
     }
   })
-  async identificarCliente(
+  async identificarPersona(
     @requestBody() credenciales: Credenciales
   ) {
-    let p = await this.servicioAutenticacion.IdentificarCliente(credenciales.usuario, credenciales.password)
+    let p = await this.servicioAutentificacion.IdentificarPersona(credenciales.usuario, credenciales.clave);
     if (p) {
-      let token = this.servicioAutenticacion.GenerarTokenJWT(p);
+      let token = this.servicioAutentificacion.GenerarTokenJWT(p);
       return {
         datos: {
           nombre: p.nombre,
@@ -48,11 +47,88 @@ export class ClienteController {
         },
         tk: token
       }
+
     } else {
       throw new HttpErrors[401]("Datos invalidos");
     }
+
   }
 
+  @post("/cambiarContrasenaManu", {
+    responses: {
+      '200': {
+        description: "Cambiar contraseña manual"
+      }
+    }
+  })
+  async cambiarContrasenaManu(
+    @requestBody() credenciales: Credenciales
+  ) {
+
+    let p = await this.servicioAutentificacion.IdentificarPersona(credenciales.usuario, credenciales.clave);
+    if (p) {
+
+      let claveCifrado = this.servicioAutentificacion.CifrarClave(credenciales.claveNew);
+      p.password = claveCifrado;
+      await this.clienteRepository.updateById(p.id, p);
+
+      let destino = p.correo;
+      let asunto = 'Alerta de cambio de contraseña'
+      let contenido = `Hola ${p.nombre}, su contraseña fue cambiada y es: ${credenciales.claveNew}`;
+
+      fetch(`${Llaves.urlServicioNotificaciones}/envio-correo?correo_destino=${destino}&asunto=${asunto}&contenido=${contenido}`)
+        .then((data: any) => {
+          console.log(data)
+        })
+      fetch(`${Llaves.urlServicioNotificaciones}/sms?mensaje=${contenido}&telefono=${p.telefono}`)
+        .then((data: any) => {
+          console.log(data)
+        })
+
+    } else {
+      throw new HttpErrors[401]("Usuario invalido");
+    }
+
+  }
+
+
+  @post('/cambiarContrasenaAu', {
+    responses: {
+      '200': {
+        description: "Cambiar contraseña automatico"
+      }
+    }
+  })
+  async cambiarContrasenaAu(
+    @requestBody() credenciales: Credenciales
+  ) {
+    let p = await this.servicioAutentificacion.IdentificarNombreUsuario(credenciales.usuario);
+    if (p) {
+      let clave = this.servicioAutentificacion.GenerarClave();
+      let claveCifrado = this.servicioAutentificacion.CifrarClave(clave);
+      p.password = claveCifrado;
+      await this.clienteRepository.updateById(p.id, p);
+
+      let destino = p.correo;
+      let asunto = 'Alerta de cambio de contraseña'
+      let contenido = `Hola ${p.nombre}, su contraseña fue cambiada y es: ${clave}`;
+
+      fetch(`${Llaves.urlServicioNotificaciones}/envio-correo?correo_destino=${destino}&asunto=${asunto}&contenido=${contenido}`)
+        .then((data: any) => {
+          console.log(data)
+        })
+      fetch(`${Llaves.urlServicioNotificaciones}/sms?mensaje=${contenido}&telefono=${p.telefono}`)
+        .then((data: any) => {
+          console.log(data)
+        })
+
+
+    } else {
+      throw new HttpErrors[401]("Usuario invalido");
+    }
+
+
+  }
 
   @post('/clientes')
   @response(200, {
@@ -72,25 +148,20 @@ export class ClienteController {
     })
     cliente: Omit<Cliente, 'id'>,
   ): Promise<Cliente> {
-
-    let password = this.servicioAutenticacion.GenerarPassword();
-    let passwordCifrada = this.servicioAutenticacion.CifrarPassword(password);
-    cliente.password = passwordCifrada;
+    let clave = this.servicioAutentificacion.GenerarClave();
+    let claveCifrado = this.servicioAutentificacion.CifrarClave(clave);
+    cliente.password = claveCifrado;
     let p = await this.clienteRepository.create(cliente);
-
-
     //Notificar al usuario
     let destino = cliente.correo;
-    let asunto = 'registro en la plataforma';
-    let contenido = `Hola ${cliente.nombre}, su nombre de usuario es: ${cliente.correo} y su contraseña es: ${password}`;
+    let asunto = 'Registro en la plataforma'
+    let contenido = `Hola ${cliente.nombre}, su nombre de usuario es ${cliente.correo} y su contraseña es: ${clave} y su rol es:  ${cliente.rol}`;
 
-    fetch(`${Llaves.urlServicioNotificaciones}/envio-correo?correo_destino=${destino}$asunto=${asunto}$contenido=${contenido}`)
+    fetch(`${Llaves.urlServicioNotificaciones}/envio-correo?correo_destino=${destino}&asunto=${asunto}&contenido=${contenido}`)
       .then((data: any) => {
-        console.log(data);
+        console.log(data)
       })
-
     return p;
-    //return this.clienteRepository.create(cliente);
   }
 
   @get('/clientes/count')

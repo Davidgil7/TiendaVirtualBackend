@@ -28,16 +28,28 @@ export class Articulos extends Entity {
   referencia: string;
 
   @property({
+    type: 'number',
+    required: true,
+  })
+  stock: number;
+
+  @property({
     type: 'string',
     required: true,
   })
-  stock: string;
+  proveedor: string;
 
   @property({
     type: 'number',
     required: true,
   })
   precio: number;
+
+  @property({
+    type: 'string',
+    required: true,
+  })
+  urlimagen: string;
 
   @property({
     type: 'string',

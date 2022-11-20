@@ -1,4 +1,4 @@
-import {Entity, model, property, hasMany} from '@loopback/repository';
+import {Entity, hasMany, model, property} from '@loopback/repository';
 import {Ventas} from './ventas.model';
 
 @model()
@@ -51,6 +51,12 @@ export class Cliente extends Entity {
     required: true,
   })
   password: string;
+
+  @property({
+    type: 'string',
+    required: true,
+  })
+  rol: string;
 
   @hasMany(() => Ventas)
   ventas: Ventas[];

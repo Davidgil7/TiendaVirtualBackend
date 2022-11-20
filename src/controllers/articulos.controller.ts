@@ -18,10 +18,10 @@ import {ArticulosRepository} from '../repositories';
 export class ArticulosController {
   constructor(
     @repository(ArticulosRepository)
-    public articulosRepository : ArticulosRepository,
-  ) {}
+    public articulosRepository: ArticulosRepository,
+  ) { }
 
-  @authenticate("admin")
+  @authenticate("Administrador")
   @post('/articulos')
   @response(200, {
     description: 'Articulos model instance',
